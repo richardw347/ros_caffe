@@ -4,7 +4,7 @@ project(ros_caffe)
 add_definitions(-DCPU_ONLY=1)
 
 find_package(catkin REQUIRED COMPONENTS
-  roscpp roslib std_msgs sensor_msgs image_transport cv_bridge
+  roscpp roslib std_msgs sensor_msgs image_transport cv_bridge cb1_msgs
 )
 
 set(CAFFE_INCLUDEDIR caffe/include caffe/distribute/include)

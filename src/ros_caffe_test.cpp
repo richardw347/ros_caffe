@@ -10,6 +10,7 @@
 #include <std_msgs/String.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
+#include <cb1_msgs/CaffeClassify.h>
 #include "Classifier.h"
 
 const std::string RECEIVE_IMG_TOPIC_NAME = "camera/rgb/image_raw";
@@ -22,8 +23,10 @@ std::string mean_file;
 std::string label_file;
 std::string image_path;
 
-ros::Publisher gPublisher;
+//ros::Publisher gPublisher;
+ros::ServiceServer classifyServiceServer;
 
+/*
 void publishRet(const std::vector<Prediction>& predictions);
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
@@ -36,11 +39,10 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
     } catch (cv_bridge::Exception& e) {
         ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
     }
-}
+}*/
 
-// TODO: Define a msg or create a service
-// Try to receive : $rostopic echo /caffe_ret
-void publishRet(const std::vector<Prediction>& predictions)  {
+
+/*void publishRet(const std::vector<Prediction>& predictions)  {
     std_msgs::String msg;
     std::stringstream ss;
     for (size_t i = 0; i < predictions.size(); ++i) {
@@ -49,15 +51,33 @@ void publishRet(const std::vector<Prediction>& predictions)  {
     }
     msg.data = ss.str();
     gPublisher.publish(msg);
+}*/
+
+
+bool classifyServCallback(cb1_msgs::CaffeClassify::Request& request, cb1_msgs::CaffeClassify::Response& response){
+    try {
+        cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(request.input_image, "bgr8");
+        cv::Mat img = cv_ptr->image;
+        std::vector<Prediction> predictions = classifier->Classify(img);
+        size_t pred_size = predictions.size();
+        for (size_t i=0; i<pred_size; i++){
+            response.labels[i] = predictions[i].first;
+            response.probabilities[i] = predictions[i].second;
+        }
+    } catch (cv_bridge::Exception& e) {
+        ROS_ERROR("Could not convert from '%s' to 'bgr8'.", request.input_image.encoding.c_str());
+    }
+    return true;
 }
+
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "ros_caffe_test");
     ros::NodeHandle nh;
-    image_transport::ImageTransport it(nh);
+    // image_transport::ImageTransport it(nh);
     // To receive an image from the topic, PUBLISH_RET_TOPIC_NAME
-    image_transport::Subscriber sub = it.subscribe(RECEIVE_IMG_TOPIC_NAME, 1, imageCallback);
-	gPublisher = nh.advertise<std_msgs::String>(PUBLISH_RET_TOPIC_NAME, 100);
+    // image_transport::Subscriber sub = it.subscribe(RECEIVE_IMG_TOPIC_NAME, 1, imageCallback);
+	// gPublisher = nh.advertise<std_msgs::String>(PUBLISH_RET_TOPIC_NAME, 100);
     const std::string ROOT_SAMPLE = ros::package::getPath("ros_caffe");
     model_path = ROOT_SAMPLE + "/data/deploy.prototxt";
     weights_path = ROOT_SAMPLE + "/data/bvlc_reference_caffenet.caffemodel";
@@ -70,14 +90,16 @@ int main(int argc, char **argv) {
     // Test data/cat.jpg
     cv::Mat img = cv::imread(image_path, -1);
     std::vector<Prediction> predictions = classifier->Classify(img);
+
     /* Print the top N predictions. */
     std::cout << "Test default image under /data/cat.jpg" << std::endl;
     for (size_t i = 0; i < predictions.size(); ++i) {
         Prediction p = predictions[i];
         std::cout << std::fixed << std::setprecision(4) << p.second << " - \"" << p.first << "\"" << std::endl;
     }
-	publishRet(predictions);
 
+    ROS_INFO("Classification service started...");
+    classifyServiceServer = nh.advertiseService("caffe_classify", classifyServCallback);
     ros::spin();
     delete classifier;
     ros::shutdown();
