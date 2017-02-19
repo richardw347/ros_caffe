@@ -10,7 +10,7 @@
 #include <std_msgs/String.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
-#include <cb1_msgs/CaffeClassify.h>
+#include <spark_msgs/CaffeClassify.h>
 #include "Classifier.h"
 
 const std::string RECEIVE_IMG_TOPIC_NAME = "camera/rgb/image_raw";
@@ -54,7 +54,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
 }*/
 
 
-bool classifyServCallback(cb1_msgs::CaffeClassify::Request& request, cb1_msgs::CaffeClassify::Response& response){
+bool classifyServCallback(spark_msgs::CaffeClassify::Request& request, spark_msgs::CaffeClassify::Response& response){
     try {
         cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(request.input_image, "bgr8");
         cv::Mat img = cv_ptr->image;
@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
     }
 
     ROS_INFO("Classification service started...");
-    classifyServiceServer = nh.advertiseService("caffe_classify", classifyServCallback);
+    classifyServiceServer = nh.advertiseService("spark_recognition/caffe_classify", classifyServCallback);
     ros::spin();
     delete classifier;
     ros::shutdown();
