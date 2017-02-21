@@ -56,13 +56,18 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg) {
 
 bool classifyServCallback(spark_msgs::CaffeClassify::Request& request, spark_msgs::CaffeClassify::Response& response){
     try {
+        ROS_INFO("Got classification request");
         cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(request.input_image, "bgr8");
         cv::Mat img = cv_ptr->image;
+        ROS_INFO("Image converted");
         std::vector<Prediction> predictions = classifier->Classify(img);
+        ROS_INFO("Image classified");
         size_t pred_size = predictions.size();
+        ROS_INFO("Got %d predications", pred_size);
         for (size_t i=0; i<pred_size; i++){
-            response.labels[i] = predictions[i].first;
-            response.probabilities[i] = predictions[i].second;
+            ROS_INFO_STREAM("label: " << predictions[i].first << " probability: " << predictions[i].second);
+            response.labels.push_back(predictions[i].first);
+            response.probabilities.push_back(predictions[i].second);
         }
     } catch (cv_bridge::Exception& e) {
         ROS_ERROR("Could not convert from '%s' to 'bgr8'.", request.input_image.encoding.c_str());
@@ -97,10 +102,14 @@ int main(int argc, char **argv) {
         Prediction p = predictions[i];
         std::cout << std::fixed << std::setprecision(4) << p.second << " - \"" << p.first << "\"" << std::endl;
     }
-
+    ROS_INFO("Starting classification service...");
+    classifyServiceServer = nh.advertiseService("/spark_recognition/caffe_classify", classifyServCallback);
     ROS_INFO("Classification service started...");
-    classifyServiceServer = nh.advertiseService("spark_recognition/caffe_classify", classifyServCallback);
-    ros::spin();
+    ros::Rate r(10);
+    while (ros::ok()){
+        ros::spinOnce();
+        r.sleep();
+    }
     delete classifier;
     ros::shutdown();
     return 0;
